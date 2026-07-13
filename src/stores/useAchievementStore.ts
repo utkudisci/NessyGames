@@ -46,6 +46,30 @@ export const ACHIEVEMENT_REGISTRY: Record<string, Omit<Achievement, 'isUnlocked'
     description: 'Oyunu 10 kez oyna.',
     icon: '🔥',
   },
+  madlab_first_sort: {
+    id: 'madlab_first_sort',
+    title: 'İlk Ayrıştırma',
+    description: 'MadLab\'de ilk tüpü başarıyla sırala.',
+    icon: '🧪',
+  },
+  madlab_no_undo: {
+    id: 'madlab_no_undo',
+    title: 'Kusursuz Kimyager',
+    description: 'Geri almayı hiç kullanmadan bir seviye çöz.',
+    icon: '🛡️',
+  },
+  madlab_perfect_stars: {
+    id: 'madlab_perfect_stars',
+    title: '3 Yıldızlı Deha',
+    description: 'Optimal hamle limitinin altında 3 yıldızla seviye bitir.',
+    icon: '⭐',
+  },
+  madlab_expert_level: {
+    id: 'madlab_expert_level',
+    title: 'Baş Simyacı',
+    description: 'Expert (Uzman) zorluktaki bir seviyeyi başarıyla tamamla.',
+    icon: '🔬',
+  },
 };
 
 interface AchievementToast {

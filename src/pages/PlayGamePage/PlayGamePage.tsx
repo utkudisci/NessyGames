@@ -122,6 +122,14 @@ export const PlayGamePage: React.FC = () => {
 
   const GameComponent = game.component;
 
+  if (game.id !== 'collapse') {
+    return (
+      <div className="w-full h-full min-h-[calc(100vh-120px)] flex flex-col items-center select-none text-slate-100">
+        <GameComponent key={sessionKey} mode={mode} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Header bar */}

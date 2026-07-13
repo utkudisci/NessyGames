@@ -1,5 +1,6 @@
 import type { GameMetadata } from './gameTypes';
 import { CollapseGame } from '../games/collapse/CollapseGame';
+import { MadLabGame } from '../games/madlab/MadLabGame';
 
 export const gameRegistry: GameMetadata[] = [
   {
@@ -13,6 +14,18 @@ export const gameRegistry: GameMetadata[] = [
     component: CollapseGame,
     highScoreSupported: true,
     modes: ['classic', 'time', 'arcade'],
+  },
+  {
+    id: 'madlab',
+    title: 'MadLab Color Sort',
+    description: 'Dengesiz kimyasal bileşikleri ayrıştırın ve her test tüpünde yalnızca tek bir renk kalmasını sağlayın. Stratejik ve eğlenceli!',
+    thumbnail: '/assets/images/madlab_thumbnail.png',
+    route: 'madlab',
+    categories: ['Puzzle', 'Sorting', 'Casual'],
+    status: 'available',
+    component: MadLabGame,
+    highScoreSupported: true,
+    modes: ['classic', 'daily'],
   },
   {
     id: 'tetris-coming',
