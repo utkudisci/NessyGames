@@ -7,6 +7,7 @@ export interface ActiveSoundHandle {
 class AudioService {
   private ctx: AudioContext | null = null;
   private musicInterval: any = null;
+  private activeHandles: Set<ActiveSoundHandle> = new Set();
 
   private initCtx() {
     if (!this.ctx) {
@@ -126,24 +127,50 @@ class AudioService {
 
     // Play an ascending sequence of notes based on combo count
     const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]; // C major scale
-    const noteIndex = Math.min(notes.length - 1, combo - 1);
-    const freq = notes[noteIndex];
+    if (combo <= notes.length) {
+      const noteIndex = Math.min(notes.length - 1, combo - 1);
+      const freq = notes[noteIndex];
 
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
 
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(freq * 1.5, this.ctx.currentTime + 0.2);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, this.ctx.currentTime + 0.2);
 
-    gain.gain.setValueAtTime(volume * 0.35, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+      gain.gain.setValueAtTime(volume * 0.35, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
 
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
 
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.26);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.26);
+    } else {
+      // Max pitch reached: Play the max combo note followed by its octave (C5 -> C6)
+      // We use the same triangle wave and slide effect so it sounds cohesive with the previous combos
+      const freqs = [523.25, 1046.50]; // C5, C6
+      const delay = 0.08;
+      freqs.forEach((freq, idx) => {
+        const time = this.ctx!.currentTime + idx * delay;
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, time);
+        // Apply the same slide effect as regular combo notes
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.5, time + 0.2);
+
+        gain.gain.setValueAtTime(volume * 0.35, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
+
+        osc.connect(gain);
+        gain.connect(this.ctx!.destination);
+
+        osc.start(time);
+        osc.stop(time + 0.26);
+      });
+    }
   }
 
   playBonus() {
@@ -296,8 +323,10 @@ class AudioService {
           try { n.stop(); } catch (e) {}
         });
         activeNodes.length = 0;
+        this.activeHandles.delete(handle);
       }
     };
+    this.activeHandles.add(handle);
 
     if (!this.ctx) return handle;
     const { master, sfx } = this.getVolumes();
@@ -533,8 +562,10 @@ class AudioService {
         }
         activeTimeouts.forEach(t => clearTimeout(t));
         activeTimeouts.length = 0;
+        this.activeHandles.delete(handle);
       }
     };
+    this.activeHandles.add(handle);
 
     if (!this.ctx) return handle;
     const { master, sfx } = this.getVolumes();
@@ -621,8 +652,10 @@ class AudioService {
         if (lfo) {
           try { lfo.stop(); } catch (e) {}
         }
+        this.activeHandles.delete(handle);
       }
     };
+    this.activeHandles.add(handle);
 
     if (!this.ctx) return handle;
     const { master, sfx } = this.getVolumes();
@@ -748,29 +781,134 @@ class AudioService {
     playTone(246.94, 0.66, 0.45);  // B3
   }
 
-  startMusic() {
+  startMusic(mode: string = 'classic', level: number = 1) {
     this.initCtx();
     if (!this.ctx) return;
     this.stopMusic();
 
     const { master, music } = this.getVolumes();
-    let vol = master * music * 0.08; // Keep music soft
+    let vol = master * music * 0.12; // Increased volume
 
-    // We program a very soft, minimal procedural arpeggiator to run in the background
-    // That sounds ambient and doesn't load a huge file!
-    const chords = [
-      [196.00, 246.94, 293.66, 392.00], // G major
-      [220.00, 261.63, 329.63, 440.00], // A minor
-      [174.61, 220.00, 261.63, 349.23], // F major
-      [196.00, 246.94, 293.66, 392.00]  // G major
-    ];
+    let chords: number[][] = [];
+    let intervalMs = 800;
+
+    if (mode === 'time') {
+      chords = [
+        [261.63, 329.63, 392.00, 523.25], // C major (higher octave)
+        [349.23, 440.00, 523.25, 698.46], // F major
+        [392.00, 493.88, 587.33, 783.99], // G major
+        [261.63, 329.63, 392.00, 523.25]  // C major
+      ];
+      intervalMs = 400; // Faster
+    } else if (mode === 'arcade') {
+      // 10 different intensity levels for Arcade
+      if (level < 6) {
+        // Level 1-5: Tense but slow
+        chords = [
+          [146.83, 174.61, 220.00, 293.66], // D minor
+          [164.81, 196.00, 246.94, 329.63], // E minor
+          [130.81, 155.56, 196.00, 261.63], // C minor
+          [146.83, 174.61, 220.00, 293.66]  // D minor
+        ];
+        intervalMs = 600;
+      } else if (level < 11) {
+        // Level 6-10: Faster, moving up
+        chords = [
+          [174.61, 207.65, 261.63, 349.23], // F minor
+          [196.00, 233.08, 293.66, 392.00], // G minor
+          [164.81, 196.00, 246.94, 329.63], // E minor
+          [174.61, 207.65, 261.63, 349.23]  // F minor
+        ];
+        intervalMs = 450;
+      } else if (level < 16) {
+        // Level 11-15: Even faster, aggressive
+        chords = [
+          [220.00, 261.63, 329.63, 440.00], // A minor
+          [246.94, 293.66, 370.00, 493.88], // B minor
+          [196.00, 233.08, 293.66, 392.00], // G minor
+          [220.00, 261.63, 329.63, 440.00]  // A minor
+        ];
+        intervalMs = 350;
+      } else if (level < 21) {
+        // Level 16-20: Frantic
+        chords = [
+          [293.66, 349.23, 440.00, 587.33], // D minor (higher)
+          [329.63, 392.00, 493.88, 659.25], // E minor (higher)
+          [261.63, 311.13, 392.00, 523.25], // C minor (higher)
+          [293.66, 349.23, 440.00, 587.33]  // D minor (higher)
+        ];
+        intervalMs = 250;
+      } else if (level < 26) {
+        // Level 21-25: Overdrive
+        chords = [
+          [392.00, 466.16, 587.33, 783.99], // G minor (very high)
+          [440.00, 523.25, 659.25, 880.00], // A minor (very high)
+          [349.23, 415.30, 523.25, 698.46], // F minor (very high)
+          [392.00, 466.16, 587.33, 783.99]  // G minor (very high)
+        ];
+        intervalMs = 180;
+      } else if (level < 31) {
+        // Level 26-30: Diminished tension
+        chords = [
+          [466.16, 554.37, 659.25, 932.33], // Bb diminished
+          [415.30, 493.88, 587.33, 830.61], // Ab diminished
+          [369.99, 440.00, 523.25, 739.99], // Gb diminished
+          [466.16, 554.37, 659.25, 932.33]  // Bb diminished
+        ];
+        intervalMs = 150;
+      } else if (level < 36) {
+        // Level 31-35: Chromatic ascent
+        chords = [
+          [523.25, 622.25, 783.99, 1046.50], // C minor (super high)
+          [554.37, 659.25, 830.61, 1108.73], // C# minor
+          [587.33, 698.46, 880.00, 1174.66], // D minor
+          [622.25, 739.99, 932.33, 1244.51]  // Eb minor
+        ];
+        intervalMs = 130;
+      } else if (level < 41) {
+        // Level 36-40: Dissonant madness
+        chords = [
+          [659.25, 783.99, 987.77, 1318.51], // E minor
+          [698.46, 830.61, 1046.50, 1396.91], // F minor
+          [622.25, 739.99, 932.33, 1244.51], // Eb minor
+          [739.99, 880.00, 1108.73, 1479.98] // F# minor
+        ];
+        intervalMs = 110;
+      } else if (level < 46) {
+        // Level 41-45: Glitch speed
+        chords = [
+          [783.99, 932.33, 1174.66, 1567.98], // G minor
+          [880.00, 1046.50, 1318.51, 1760.00], // A minor
+          [783.99, 932.33, 1174.66, 1567.98], // G minor
+          [987.77, 1174.66, 1479.98, 1975.53] // B minor
+        ];
+        intervalMs = 90;
+      } else {
+        // Level 46-50+: Ultimate Chaos
+        chords = [
+          [1046.50, 1244.51, 1567.98, 2093.00], // C minor
+          [1174.66, 1396.91, 1760.00, 2349.32], // D minor
+          [1318.51, 1567.98, 1975.53, 2637.02], // E minor
+          [1046.50, 1396.91, 1760.00, 2093.00]  // Mixed dissonance
+        ];
+        intervalMs = 70;
+      }
+    } else {
+      chords = [
+        [196.00, 246.94, 293.66, 392.00], // G major
+        [220.00, 261.63, 329.63, 440.00], // A minor
+        [174.61, 220.00, 261.63, 349.23], // F major
+        [196.00, 246.94, 293.66, 392.00]  // G major
+      ];
+      intervalMs = 800; // Normal
+    }
 
     let chordIdx = 0;
     let step = 0;
 
     const playStep = () => {
       const { master: currentMaster, music: currentMusic } = this.getVolumes();
-      vol = currentMaster * currentMusic * 0.06;
+      vol = currentMaster * currentMusic * 0.12;
       if (vol <= 0 || !this.ctx) return;
 
       const chord = chords[chordIdx];
@@ -799,8 +937,8 @@ class AudioService {
       }
     };
 
-    // Trigger every 800ms
-    this.musicInterval = setInterval(playStep, 800);
+    // Trigger based on mode interval
+    this.musicInterval = setInterval(playStep, intervalMs);
   }
 
   stopMusic() {
@@ -808,6 +946,14 @@ class AudioService {
       clearInterval(this.musicInterval);
       this.musicInterval = null;
     }
+  }
+
+  stopAllSounds() {
+    this.stopMusic();
+    Array.from(this.activeHandles).forEach(handle => {
+      handle.stop();
+    });
+    this.activeHandles.clear();
   }
 }
 

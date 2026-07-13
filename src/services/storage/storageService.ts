@@ -28,7 +28,7 @@ export interface DailyQuestsData {
   quests: DailyQuestProgress[];
 }
 
-const STORAGE_PREFIX = 'gamezone_';
+const STORAGE_PREFIX = 'nessygames_';
 
 const DEFAULT_SETTINGS: UserSettings = {
   theme: 'dark',

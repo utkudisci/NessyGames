@@ -36,5 +36,17 @@ export const COLLAPSE_CONFIG = {
     DIFFICULTY_SPEED_UP: 500,      // Reduce interval by 500ms per level/score target
     WARNING_ROW: 2,                // Warning starts if any block reaches row 2 or above (top 3 rows)
     COUNTDOWN_TIME: 7,             // Player has 7 seconds to clear blocks once warning triggers
+  },
+
+  // Classic Mode config
+  CLASSIC: {
+    STARTING_ROWS: 4,              // Starts with 4 rows of blocks
+    MOVES_PER_SPAWN: 3,            // A new row spawns every 3 moves
+  },
+
+  // Time Mode config
+  TIME: {
+    STARTING_ROWS: 3,              // Starts with 3 rows of blocks
+    SPAWN_INTERVAL: 3500,          // A new row spawns every 3.5 seconds
   }
 };

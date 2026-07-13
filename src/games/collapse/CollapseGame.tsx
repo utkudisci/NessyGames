@@ -43,24 +43,26 @@ export const CollapseGame: React.FC<CollapseGameProps> = ({ mode }) => {
     }
   }, [score, level, mode, status, incrementLevel]);
 
+  const musicBracket = Math.floor((level - 1) / 5);
+
   // 2. Play Background music on start
   useEffect(() => {
     if (status === 'playing') {
-      audioService.startMusic();
+      audioService.startMusic(mode, level);
     } else {
       audioService.stopMusic();
     }
     return () => {
       audioService.stopMusic();
     };
-  }, [status]);
+  }, [status, mode, musicBracket]);
 
   // 3. React-to-Phaser pause state synchronization
   useEffect(() => {
     const phaserGame = gameInstanceRef.current;
-    if (phaserGame && phaserGame.scene.isActive('MainGameScene')) {
+    if (phaserGame) {
       const mainScene = phaserGame.scene.getScene('MainGameScene') as MainGameScene;
-      if (mainScene) {
+      if (mainScene && typeof mainScene.setPause === 'function') {
         mainScene.setPause(status === 'paused');
       }
     }
@@ -176,6 +178,9 @@ export const CollapseGame: React.FC<CollapseGameProps> = ({ mode }) => {
         gameInstanceRef.current.destroy(true);
         gameInstanceRef.current = null;
       }
+      
+      // Stop all lingering procedural sounds
+      audioService.stopAllSounds();
     };
   }, [mode, addScore, setCombo, addBlocksCleared, endGame, unlockAchievement, updateQuestProgress]);
 

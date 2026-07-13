@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Gamepad2, Heart } from 'lucide-react';
+import { Heart } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -9,11 +9,11 @@ export const Footer: React.FC = () => {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo and Brand */}
           <div className="flex items-center space-x-2">
-            <div className="p-1.5 bg-violet-600 rounded-lg">
-              <Gamepad2 className="h-5 w-5 text-white" />
+            <div className="w-8 h-8 bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center border border-slate-800">
+              <img src="/assets/images/nessy_logo.png" alt="NessyGames Logo" className="w-full h-full object-cover" />
             </div>
             <span className="text-lg font-bold font-sans tracking-wide text-white">
-              GAMEZONE
+              NessyGames
             </span>
           </div>
 
@@ -30,13 +30,13 @@ export const Footer: React.FC = () => {
             <div className="flex items-center gap-1">
               <span>Made with</span>
               <Heart className="h-4 w-4 text-red-500 fill-current animate-pulse" />
-              <span>by Antigravity</span>
+              <span>by Utku Dişci</span>
             </div>
           </div>
         </div>
 
         <div className="mt-6 border-t border-slate-900 pt-6 text-center text-xs text-slate-600">
-          &copy; {new Date().getFullYear()} GameZone. Tüm hakları saklıdır. Phaser 3 & React ile güçlendirilmiştir.
+          &copy; {new Date().getFullYear()} NessyGames. Tüm hakları saklıdır. Phaser 3 & React ile güçlendirilmiştir.
         </div>
       </div>
     </footer>

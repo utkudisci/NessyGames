@@ -5,6 +5,7 @@ import { createBoard, findConnectedGroup, collapseBoard, hasAvailableMoves, addR
 import { gameEventBus } from '../utils/eventBus';
 import { audioService } from '../../../services/audio/audioService';
 import type { ActiveSoundHandle } from '../../../services/audio/audioService';
+import { useGameStore } from '../../../stores/useGameStore';
 
 export class MainGameScene extends Phaser.Scene {
   // Board state
@@ -28,8 +29,10 @@ export class MainGameScene extends Phaser.Scene {
   private dangerLine: Phaser.GameObjects.Graphics | null = null;
   private cleanTimer: Phaser.Time.TimerEvent | null = null;
   private debugCleanHandler: (() => void) | null = null;
-  private activeDrumrollSound: ActiveSoundHandle | null = null;
+  private debugComboHandler: (() => void) | null = null;
   private warningAlarmSound: ActiveSoundHandle | null = null;
+  
+  private fireEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private perfectCleanOpportunityActive: boolean = false;
   private perfectCleanHalos: Phaser.GameObjects.Graphics[] = [];
   
@@ -62,10 +65,6 @@ export class MainGameScene extends Phaser.Scene {
     this.arcadeWarningActive = false;
     this.currentSpawnInterval = COLLAPSE_CONFIG.ARCADE.INITIAL_SPAWN_INTERVAL;
 
-    if (this.activeDrumrollSound) {
-      this.activeDrumrollSound.stop();
-      this.activeDrumrollSound = null;
-    }
     if (this.warningAlarmSound) {
       this.warningAlarmSound.stop();
       this.warningAlarmSound = null;
@@ -76,6 +75,28 @@ export class MainGameScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor('#090d16');
     audioService.playStart();
+
+    // Generate a simple white circle texture for particles
+    const graphics = this.make.graphics({ x: 0, y: 0 });
+    graphics.fillStyle(0xffffff, 1.0);
+    graphics.fillCircle(8, 8, 8);
+    graphics.generateTexture('particle_circle', 16, 16);
+
+    // Create bottom fire emitter
+    this.fireEmitter = this.add.particles(0, 0, 'particle_circle', {
+      x: { min: 0, max: this.cameras.main.width },
+      y: this.cameras.main.height + 20,
+      lifespan: { min: 400, max: 1200 },
+      speedY: { min: -100, max: -400 },
+      speedX: { min: -20, max: 20 },
+      scale: { start: 0.5, end: 0 },
+      alpha: { start: 0.7, end: 0 },
+      tint: [ 0xff4500, 0xff8c00, 0xffd700, 0xff0000 ], // Fire colors
+      blendMode: 'ADD',
+      frequency: -1, // start stopped
+      quantity: 1,
+    });
+    this.fireEmitter.setDepth(0); // Render behind blocks
 
     // Calculate dimensions dynamically to fit screen
     this.resizeGrid();
@@ -141,6 +162,13 @@ export class MainGameScene extends Phaser.Scene {
     };
     gameEventBus.on('debug:set:clean-state', this.debugCleanHandler);
 
+    this.debugComboHandler = () => {
+      this.currentCombo = 45;
+      this.updateFireIntensity();
+      gameEventBus.emit('combo:changed', 45);
+    };
+    gameEventBus.on('debug:set:combo-45', this.debugComboHandler);
+
     // Setup Arcade Mode mechanics if active
     if (this.gameMode === 'arcade') {
       this.startArcadeTimer();
@@ -150,10 +178,6 @@ export class MainGameScene extends Phaser.Scene {
     // Clean up sounds on scene shutdown
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.clearArcadeWarning();
-      if (this.activeDrumrollSound) {
-        this.activeDrumrollSound.stop();
-        this.activeDrumrollSound = null;
-      }
     });
   }
 
@@ -174,6 +198,7 @@ export class MainGameScene extends Phaser.Scene {
       if (elapsed >= 2200) {
         // Combo has expired! Reset it to 1 and emit the change!
         this.currentCombo = 1;
+        this.updateFireIntensity();
         gameEventBus.emit('combo:changed', 1);
         gameEventBus.emit('combo:timer:progress', 0);
       } else {
@@ -541,10 +566,6 @@ export class MainGameScene extends Phaser.Scene {
       this.cleanTimer.destroy();
       this.cleanTimer = null;
     }
-    if (this.activeDrumrollSound) {
-      this.activeDrumrollSound.stop();
-      this.activeDrumrollSound = null;
-    }
     if (this.perfectCleanOpportunityActive) {
       this.clearPerfectCleanEffects();
     }
@@ -558,12 +579,22 @@ export class MainGameScene extends Phaser.Scene {
     }
     this.lastMatchTime = currentTime;
 
+    this.updateFireIntensity();
+
     // Calculate score
     const groupSize = group.length;
     const rawScore = groupSize * groupSize * COLLAPSE_CONFIG.SCORE_MULTIPLIER;
+    
     // Apply combo bonus
-    const comboBonus = this.currentCombo > 1 ? (this.currentCombo - 1) * 50 : 0;
-    const finalScore = rawScore + comboBonus;
+    let finalScore = rawScore;
+    if (this.currentCombo > 1) {
+      if (this.currentCombo >= 50) {
+        finalScore = rawScore * 75; // Multiply by 75 for massive score
+      } else {
+        const comboBonus = (this.currentCombo - 1) * 50;
+        finalScore = rawScore + comboBonus;
+      }
+    }
 
     // Play synthesized pop SFX
     audioService.playPop(groupSize);
@@ -581,14 +612,19 @@ export class MainGameScene extends Phaser.Scene {
 
     // Emit score and updates to React HUD
     gameEventBus.emit('score:changed', finalScore);
-    gameEventBus.emit('combo:changed', this.currentCombo);
+    const displayCombo = Math.min(this.currentCombo, 50); // Cap UI combo visual at 50
+    gameEventBus.emit('combo:changed', displayCombo);
     gameEventBus.emit('blocks:removed', groupSize);
 
     // Spawning particles
     this.createExplosionParticles(group, color);
 
     // Flying score display
-    this.spawnScoreText(finalScore, clickX, clickY);
+    if (this.currentCombo >= 50) {
+      this.spawnRainbowText("MAKSİMUM KOMBO\nx75!", clickX, clickY);
+    } else {
+      this.spawnScoreText(finalScore, clickX, clickY);
+    }
 
     // Build timeline of animations
     const destroyTweens: Phaser.Types.Tweens.TweenBuilderConfig[] = [];
@@ -676,11 +712,6 @@ export class MainGameScene extends Phaser.Scene {
         this.cleanTimer.destroy();
         this.cleanTimer = null;
       }
-      if (this.activeDrumrollSound) {
-        this.activeDrumrollSound.stop();
-        this.activeDrumrollSound = null;
-      }
-
       audioService.playFanfare();
       gameEventBus.emit('score:changed', 3000); // 3000 pts perfect clearance bonus!
       gameEventBus.emit('perfect:clean'); // Trigger React Confetti overlay
@@ -719,8 +750,16 @@ export class MainGameScene extends Phaser.Scene {
       
       // Re-populate classical boards or let the game finish
       if (this.gameMode === 'classic') {
-        this.board = createBoard(this.rows, this.cols, this.colorCount);
-        this.renderInitialBoard();
+        // Single board mode: after perfect clean, the game ends.
+        this.time.delayedCall(2000, () => {
+          useGameStore.getState().endGame();
+        });
+        return;
+      } else if (this.gameMode === 'time') {
+        // Time mode: after perfect clean, repopulate board so they can continue scoring
+        this.time.delayedCall(2000, () => {
+          this.repopulateBoard();
+        });
         return;
       } else if (this.gameMode === 'arcade') {
         this.isAnimating = true;
@@ -737,13 +776,9 @@ export class MainGameScene extends Phaser.Scene {
         });
       }
     } else if (this.checkPerfectCleanOpportunity()) {
-      // PERFECT CLEAN CHALLENGE: Pulse blocks with halo glow, play looping drumroll, give 5 seconds to click!
+      // PERFECT CLEAN CHALLENGE: Pulse blocks with halo glow, give 5 seconds to click!
       if (!this.cleanTimer) {
         this.perfectCleanOpportunityActive = true;
-        this.activeDrumrollSound = audioService.playDrumroll({
-          looping: true,
-          volume: 0.8
-        });
 
         // Add pulsing grow effect (1.0 -> 1.08 -> 1.0) and halo glow to remaining blocks
         this.blockContainers.forEach((container) => {
@@ -790,10 +825,6 @@ export class MainGameScene extends Phaser.Scene {
         // Start 5-second countdown timer
         this.cleanTimer = this.time.delayedCall(5000, () => {
           this.cleanTimer = null;
-          if (this.activeDrumrollSound) {
-            this.activeDrumrollSound.stop();
-            this.activeDrumrollSound = null;
-          }
 
           // Play wrong buzzer sound
           audioService.playWrongBuzzer();
@@ -828,71 +859,74 @@ export class MainGameScene extends Phaser.Scene {
       }
 
       if (isUnmatchableLeftovers) {
-        const rand = Math.random();
-        if (rand < 0.7) {
-          // Trigger Clean sequence instantly without drum roll or delay (since Perfect Clean is impossible here)
+        if (this.gameMode === 'classic' || this.gameMode === 'time') {
+          // Give them the clean bonus, then the game will end in triggerCleanSequence
           this.triggerCleanSequence();
         } else {
-          // Add new row alttan
-          this.time.delayedCall(400, () => {
-            const addRowText = this.add.text(this.gridOffsetX + this.gridWidth / 2, this.gridOffsetY + this.gridHeight / 2, 'HAMLE KALMADI!\nYENİ SATIR EKLENİYOR...', {
-              fontFamily: 'Outfit, sans-serif',
-              fontSize: '28px',
-              fontStyle: 'bold',
-              color: '#10b981',
-              align: 'center'
-            }).setOrigin(0.5, 0.5).setDepth(10);
-            addRowText.setStroke('#000000', 6);
-            
-            this.tweens.add({
-              targets: addRowText,
-              scaleX: 1.1,
-              scaleY: 1.1,
-              alpha: { from: 1, to: 0 },
-              duration: 1000,
-              ease: 'Cubic.easeOut',
-              onComplete: () => {
-                addRowText.destroy();
-              }
+          // Arcade mode
+          const rand = Math.random();
+          if (rand < 0.7) {
+            this.triggerCleanSequence();
+          } else {
+            this.time.delayedCall(400, () => {
+              const addRowText = this.add.text(this.gridOffsetX + this.gridWidth / 2, this.gridOffsetY + this.gridHeight / 2, 'HAMLE KALMADI!\nYENİ SATIR EKLENİYOR...', {
+                fontFamily: 'Outfit, sans-serif',
+                fontSize: '28px',
+                fontStyle: 'bold',
+                color: '#10b981',
+                align: 'center'
+              }).setOrigin(0.5, 0.5).setDepth(10);
+              addRowText.setStroke('#000000', 6);
+              this.tweens.add({
+                targets: addRowText,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                alpha: { from: 1, to: 0 },
+                duration: 1000,
+                ease: 'Cubic.easeOut',
+                onComplete: () => addRowText.destroy()
+              });
+              this.spawnNewArcadeRow(true);
             });
-
-            this.spawnNewArcadeRow(true);
-          });
+          }
         }
       } else {
-        // Normal behavior: Roll random chance: 70% shuffle, 30% add new row alttan
-        const rand = Math.random();
-        if (rand < 0.7) {
-          this.time.delayedCall(400, () => {
-            this.shuffleBoard();
-          });
+        if (this.gameMode === 'classic') {
+          // No moves left on single board, game over
+          useGameStore.getState().endGame();
+        } else if (this.gameMode === 'time') {
+          // Time mode: no moves left, repopulate board so they can continue scoring
+          this.repopulateBoard();
         } else {
-          // Add new row alttan
-          this.time.delayedCall(400, () => {
-            // Display "YENİ SATIR EKLENİYOR!" message shortly
-            const addRowText = this.add.text(this.gridOffsetX + this.gridWidth / 2, this.gridOffsetY + this.gridHeight / 2, 'HAMLE KALMADI!\nYENİ SATIR EKLENİYOR...', {
-              fontFamily: 'Outfit, sans-serif',
-              fontSize: '28px',
-              fontStyle: 'bold',
-              color: '#10b981',
-              align: 'center'
-            }).setOrigin(0.5, 0.5).setDepth(10);
-            addRowText.setStroke('#000000', 6);
-            
-            this.tweens.add({
-              targets: addRowText,
-              scaleX: 1.1,
-              scaleY: 1.1,
-              alpha: { from: 1, to: 0 },
-              duration: 1000,
-              ease: 'Cubic.easeOut',
-              onComplete: () => {
-                addRowText.destroy();
-              }
+          // Arcade Normal behavior: Roll random chance: 70% shuffle, 30% add new row alttan
+          const rand = Math.random();
+          if (rand < 0.7) {
+            this.time.delayedCall(400, () => {
+              this.shuffleBoard();
             });
-
-            this.spawnNewArcadeRow(true); // Spawn row instantly!
-          });
+          } else {
+            // Add new row alttan
+            this.time.delayedCall(400, () => {
+              const addRowText = this.add.text(this.gridOffsetX + this.gridWidth / 2, this.gridOffsetY + this.gridHeight / 2, 'HAMLE KALMADI!\nYENİ SATIR EKLENİYOR...', {
+                fontFamily: 'Outfit, sans-serif',
+                fontSize: '28px',
+                fontStyle: 'bold',
+                color: '#10b981',
+                align: 'center'
+              }).setOrigin(0.5, 0.5).setDepth(10);
+              addRowText.setStroke('#000000', 6);
+              this.tweens.add({
+                targets: addRowText,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                alpha: { from: 1, to: 0 },
+                duration: 1000,
+                ease: 'Cubic.easeOut',
+                onComplete: () => addRowText.destroy()
+              });
+              this.spawnNewArcadeRow(true); // Spawn row instantly!
+            });
+          }
         }
       }
     }
@@ -901,6 +935,13 @@ export class MainGameScene extends Phaser.Scene {
     if (this.gameMode === 'arcade') {
       this.checkArcadeWarningState();
     }
+  }
+
+  private repopulateBoard() {
+    this.blockContainers.forEach(container => container.destroy());
+    this.blockContainers.clear();
+    this.board = createBoard(this.rows, this.cols, this.colorCount);
+    this.renderInitialBoard();
   }
 
   private shuffleBoard() {
@@ -1066,6 +1107,62 @@ export class MainGameScene extends Phaser.Scene {
         text.destroy();
       }
     });
+  }
+
+  private spawnRainbowText(msg: string, x: number, y: number) {
+    const text = this.add.text(x, y - 20, msg, {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '32px',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      align: 'center'
+    }).setOrigin(0.5, 0.5).setDepth(20);
+
+    text.setStroke('#000000', 6);
+
+    // Rainbow tint animation using update loop event since we can't easily tween tint over HSV
+    let hue = 0;
+    const colorUpdateEvent = this.time.addEvent({
+      delay: 20,
+      loop: true,
+      callback: () => {
+        if (!text.active) return;
+        hue = (hue + 10) % 360;
+        const color = Phaser.Display.Color.HSVToRGB(hue / 360, 1, 1) as Phaser.Types.Display.ColorObject;
+        text.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+      }
+    });
+
+    this.tweens.add({
+      targets: text,
+      y: y - 120,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      alpha: { from: 1, to: 0 },
+      duration: 1500,
+      ease: 'Cubic.easeOut',
+      onComplete: () => {
+        colorUpdateEvent.destroy();
+        text.destroy();
+      }
+    });
+  }
+
+  private updateFireIntensity() {
+    if (!this.fireEmitter) return;
+    
+    if (this.currentCombo > 1) {
+      const cappedCombo = Math.min(this.currentCombo, 50);
+      const intensity = cappedCombo / 50; // 0.0 to 1.0
+      
+      const freq = Phaser.Math.Linear(80, 5, intensity);
+      const qty = Math.floor(Phaser.Math.Linear(1, 5, intensity));
+      
+      this.fireEmitter.setFrequency(freq);
+      this.fireEmitter.setQuantity(qty);
+    } else {
+      this.fireEmitter.setFrequency(-1); // Stop
+    }
   }
 
   private createExplosionParticles(group: BoardPosition[], color: BlockColor) {
@@ -1573,10 +1670,18 @@ export class MainGameScene extends Phaser.Scene {
       gameEventBus.off('debug:set:clean-state', this.debugCleanHandler);
       this.debugCleanHandler = null;
     }
+    if (this.debugComboHandler) {
+      gameEventBus.off('debug:set:combo-45', this.debugComboHandler);
+      this.debugComboHandler = null;
+    }
     this.stopMusicAndTimers();
     this.clearArcadeWarning();
     if (this.perfectCleanOpportunityActive) {
       this.clearPerfectCleanEffects();
+    }
+    if (this.warningAlarmSound) {
+      this.warningAlarmSound.stop();
+      this.warningAlarmSound = null;
     }
     if (this.gridBg) {
       this.gridBg.destroy();

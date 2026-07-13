@@ -113,7 +113,7 @@ export const PlayGamePage: React.FC = () => {
   };
 
   const handleShare = () => {
-    const text = `🏆 GameZone - ${game.title} [${mode.toUpperCase()}] modunda ${score} skor elde ettim! Rekorum: ${highScore}. Sen de katıl ve oyna!`;
+    const text = `🏆 NessyGames - ${game.title} [${mode.toUpperCase()}] modunda ${score} skor elde ettim! Rekorum: ${highScore}. Sen de katıl ve oyna!`;
     navigator.clipboard.writeText(text).then(() => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
@@ -169,6 +169,17 @@ export const PlayGamePage: React.FC = () => {
             title="CLEAN & PERFECT CLEAN Testini Başlat (Tahtada sadece 2 kırmızı blok bırakır)"
           >
             DEBUG TEST
+          </button>
+
+          {/* Debug Combo x45 Button */}
+          <button
+            onClick={() => {
+              gameEventBus.emit('debug:set:combo-45');
+            }}
+            className="px-3 py-2 bg-purple-500/20 border border-purple-500/40 rounded-xl text-xs font-bold text-purple-400 hover:bg-purple-500/30 transition-colors"
+            title="Komboyu 45 yapar"
+          >
+            DEBUG COMBO 45
           </button>
         </div>
       </div>

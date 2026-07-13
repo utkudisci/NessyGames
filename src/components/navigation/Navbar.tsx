@@ -32,11 +32,11 @@ export const Navbar: React.FC = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2 group">
-              <div className="p-2 bg-gradient-to-tr from-violet-600 to-indigo-600 rounded-xl shadow-lg shadow-violet-500/20 group-hover:scale-105 transition-transform duration-300">
-                <Gamepad2 className="h-6 w-6 text-white" />
+              <div className="w-10 h-10 bg-slate-900 rounded-xl shadow-lg shadow-violet-500/20 group-hover:scale-105 transition-transform duration-300 overflow-hidden flex items-center justify-center border border-slate-800">
+                <img src="/assets/images/nessy_logo.png" alt="NessyGames Logo" className="w-full h-full object-cover" />
               </div>
               <span className="text-xl font-bold font-sans tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-violet-400 group-hover:text-violet-300 transition-colors">
-                GAMEZONE
+                NessyGames
               </span>
             </Link>
           </div>
