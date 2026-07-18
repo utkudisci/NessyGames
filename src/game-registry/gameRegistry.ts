@@ -1,6 +1,7 @@
 import type { GameMetadata } from './gameTypes';
 import { CollapseGame } from '../games/collapse/CollapseGame';
 import { MadLabGame } from '../games/madlab/MadLabGame';
+import { SlideEscapeGame } from '../games/slideescape/SlideEscapeGame';
 
 export const gameRegistry: GameMetadata[] = [
   {
@@ -26,6 +27,18 @@ export const gameRegistry: GameMetadata[] = [
     component: MadLabGame,
     highScoreSupported: true,
     modes: ['classic', 'daily'],
+  },
+  {
+    id: 'slide-escape',
+    title: 'Slide Escape',
+    description: 'Blokları yalnızca kendi yönlerinde kaydır, neon hedef bloğun önündeki yolu aç ve onu 6×6 tahtadan mümkün olan en az hamlede çıkar.',
+    thumbnail: '/assets/images/slide_escape_thumbnail.svg',
+    route: 'slide-escape',
+    categories: ['Puzzle', 'Logic', 'Sliding'],
+    status: 'available',
+    component: SlideEscapeGame,
+    highScoreSupported: false,
+    modes: ['classic'],
   },
   {
     id: 'tetris-coming',

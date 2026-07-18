@@ -26,7 +26,7 @@ export const PlayGamePage: React.FC = () => {
   // Store bindings
   const {
     status, score, highScore, combo, timeLeft, level, 
-    blocksCleared, movesMade, biggestGroup,
+    blocksCleared, movesMade, biggestGroup, lastGroupCleared,
     startGame, pauseGame, resumeGame, tickTime, addTimeBonus, resetGame
   } = useGameStore();
 
@@ -73,10 +73,11 @@ export const PlayGamePage: React.FC = () => {
       intervalId = setInterval(() => {
         tickTime();
         
-        // If time reaches 0, trigger Game Over (handled by tickTime state check or below)
+        // If time reaches 0, emit time:expired to Phaser to play waterfall animation
         const currentStoreTime = useGameStore.getState().timeLeft;
         if (currentStoreTime <= 0) {
-          useGameStore.getState().endGame();
+          clearInterval(intervalId);
+          gameEventBus.emit('time:expired');
         }
       }, 1000);
     }
@@ -88,14 +89,14 @@ export const PlayGamePage: React.FC = () => {
 
   // 3. Time bonus side-effect (When blocksCleared/movesMade changes, reward time in time mode)
   useEffect(() => {
-    if (mode === 'time' && status === 'playing' && biggestGroup > 0) {
+    if (mode === 'time' && status === 'playing' && lastGroupCleared > 0) {
       // Reward time based on the last cleared block group size
-      const reward = Math.max(0, Math.floor(biggestGroup / 3.5));
+      const reward = Math.max(0, Math.floor(lastGroupCleared / 3.5));
       if (reward > 0) {
         addTimeBonus(reward);
       }
     }
-  }, [biggestGroup, movesMade, mode, status, addTimeBonus]);
+  }, [lastGroupCleared, movesMade, mode, status, addTimeBonus]);
 
   if (!game || game.status !== 'available') {
     return (

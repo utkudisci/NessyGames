@@ -32,7 +32,7 @@ export const COLLAPSE_CONFIG = {
   // Arcade Mode config
   ARCADE: {
     INITIAL_SPAWN_INTERVAL: 12000, // Starts at 12 seconds per row
-    MIN_SPAWN_INTERVAL: 4800,      // Limits to 4.8 seconds (x2.5 speed) at higher difficulties
+    MIN_SPAWN_INTERVAL: 1500,      // Limits to 1.5 seconds at higher difficulties
     DIFFICULTY_SPEED_UP: 500,      // Reduce interval by 500ms per level/score target
     WARNING_ROW: 2,                // Warning starts if any block reaches row 2 or above (top 3 rows)
     COUNTDOWN_TIME: 7,             // Player has 7 seconds to clear blocks once warning triggers

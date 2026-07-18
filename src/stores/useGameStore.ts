@@ -15,6 +15,7 @@ interface GameState {
   blocksCleared: number;
   movesMade: number;
   biggestGroup: number;
+  lastGroupCleared: number;
   
   // Actions
   startGame: (gameId: string, mode: string) => void;
@@ -43,6 +44,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   blocksCleared: 0,
   movesMade: 0,
   biggestGroup: 0,
+  lastGroupCleared: 0,
 
   startGame: (gameId, mode) => {
     const highScore = storageService.getHighScore(gameId, mode);
@@ -104,6 +106,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         blocksCleared: nextBlocks,
         movesMade: nextMoves,
         biggestGroup: nextBiggest,
+        lastGroupCleared: count,
       };
     });
   },
@@ -140,6 +143,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       blocksCleared: 0,
       movesMade: 0,
       biggestGroup: 0,
+      lastGroupCleared: 0,
     });
   },
 }));

@@ -25,8 +25,8 @@ export const CollapseGame: React.FC<CollapseGameProps> = ({ mode }) => {
   // 1. Level progress trigger for Arcade Mode
   useEffect(() => {
     if (mode === 'arcade' && status === 'playing') {
-      // Advance level for every 1000 points
-      const calculatedLevel = Math.floor(score / 3000) + 1;
+      // Advance level for every 5000 points
+      const calculatedLevel = Math.floor(score / 5000) + 1;
       if (calculatedLevel > level) {
         incrementLevel();
         audioService.playBonus(); // Play sound level up

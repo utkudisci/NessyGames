@@ -30,6 +30,7 @@ export class MainGameScene extends Phaser.Scene {
   private cleanTimer: Phaser.Time.TimerEvent | null = null;
   private debugCleanHandler: (() => void) | null = null;
   private debugComboHandler: (() => void) | null = null;
+  private timeExpiredHandler: (() => void) | null = null;
   private warningAlarmSound: ActiveSoundHandle | null = null;
   
   private fireEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
@@ -41,6 +42,7 @@ export class MainGameScene extends Phaser.Scene {
   private hoveredGroup: BoardPosition[] = [];
   private currentCombo: number = 0;
   private lastMatchTime: number = 0;
+  private isGameOver: boolean = false;
 
   // Arcade Mode specific
   private arcadeTimerEvent: Phaser.Time.TimerEvent | null = null;
@@ -61,6 +63,7 @@ export class MainGameScene extends Phaser.Scene {
     this.hoveredGroup = [];
     this.currentCombo = 0;
     this.lastMatchTime = 0;
+    this.isGameOver = false;
     this.blockContainers.clear();
     this.arcadeWarningActive = false;
     this.currentSpawnInterval = COLLAPSE_CONFIG.ARCADE.INITIAL_SPAWN_INTERVAL;
@@ -169,6 +172,11 @@ export class MainGameScene extends Phaser.Scene {
     };
     gameEventBus.on('debug:set:combo-45', this.debugComboHandler);
 
+    this.timeExpiredHandler = () => {
+      this.gameOver();
+    };
+    gameEventBus.on('time:expired', this.timeExpiredHandler);
+
     // Setup Arcade Mode mechanics if active
     if (this.gameMode === 'arcade') {
       this.startArcadeTimer();
@@ -181,7 +189,7 @@ export class MainGameScene extends Phaser.Scene {
     });
   }
 
-  update(time: number) {
+  update(time: number, delta: number) {
     if (this.gameMode === 'arcade' && this.arcadeTimerEvent) {
       const progress = this.arcadeTimerEvent.getProgress();
       gameEventBus.emit('arcade:timer:progress', progress);
@@ -192,8 +200,13 @@ export class MainGameScene extends Phaser.Scene {
       gameEventBus.emit('arcade:danger:progress', dangerProgress);
     }
 
-    // Emit combo timer progress (active in all modes)
-    if (this.currentCombo > 1) {
+    // Freeze combo timer during animations by pushing lastMatchTime forward by frame delta
+    if (this.isAnimating && this.currentCombo > 1) {
+      this.lastMatchTime += delta;
+    }
+
+    // Emit combo timer progress (active in arcade and time modes only)
+    if (this.gameMode !== 'classic' && this.currentCombo > 1) {
       const elapsed = time - this.lastMatchTime;
       if (elapsed >= 2200) {
         // Combo has expired! Reset it to 1 and emit the change!
@@ -570,9 +583,9 @@ export class MainGameScene extends Phaser.Scene {
       this.clearPerfectCleanEffects();
     }
 
-    // Track Combo timing
+    // Track Combo timing (Arcade and Time modes only)
     const currentTime = this.time.now;
-    if (currentTime - this.lastMatchTime < 2200) {
+    if (this.gameMode !== 'classic' && currentTime - this.lastMatchTime < 2200) {
       this.currentCombo++;
     } else {
       this.currentCombo = 1;
@@ -587,7 +600,7 @@ export class MainGameScene extends Phaser.Scene {
     
     // Apply combo bonus
     let finalScore = rawScore;
-    if (this.currentCombo > 1) {
+    if (this.gameMode !== 'classic' && this.currentCombo > 1) {
       if (this.currentCombo >= 50) {
         finalScore = rawScore * 75; // Multiply by 75 for massive score
       } else {
@@ -598,7 +611,7 @@ export class MainGameScene extends Phaser.Scene {
 
     // Play synthesized pop SFX
     audioService.playPop(groupSize);
-    if (this.currentCombo > 1) {
+    if (this.gameMode !== 'classic' && this.currentCombo > 1) {
       audioService.playCombo(this.currentCombo);
     }
 
@@ -606,21 +619,23 @@ export class MainGameScene extends Phaser.Scene {
     if (groupSize >= 10) {
       gameEventBus.emit('achievement:trigger', 'big_bang');
     }
-    if (this.currentCombo >= 2) {
+    if (this.gameMode !== 'classic' && this.currentCombo >= 2) {
       gameEventBus.emit('achievement:trigger', 'combo_start');
     }
 
     // Emit score and updates to React HUD
     gameEventBus.emit('score:changed', finalScore);
-    const displayCombo = Math.min(this.currentCombo, 50); // Cap UI combo visual at 50
-    gameEventBus.emit('combo:changed', displayCombo);
+    if (this.gameMode !== 'classic') {
+      const displayCombo = Math.min(this.currentCombo, 50); // Cap UI combo visual at 50
+      gameEventBus.emit('combo:changed', displayCombo);
+    }
     gameEventBus.emit('blocks:removed', groupSize);
 
     // Spawning particles
     this.createExplosionParticles(group, color);
 
     // Flying score display
-    if (this.currentCombo >= 50) {
+    if (this.gameMode !== 'classic' && this.currentCombo >= 50) {
       this.spawnRainbowText("MAKSİMUM KOMBO\nx75!", clickX, clickY);
     } else {
       this.spawnScoreText(finalScore, clickX, clickY);
@@ -642,7 +657,7 @@ export class MainGameScene extends Phaser.Scene {
             scaleX: 0,
             scaleY: 0,
             alpha: 0,
-            duration: 150,
+            duration: 80,
             ease: 'Back.easeIn',
             onComplete: () => {
               container.destroy();
@@ -659,7 +674,7 @@ export class MainGameScene extends Phaser.Scene {
     this.tweens.addMultiple(destroyTweens);
 
     // Collapse board after fade out completes
-    this.time.delayedCall(160, () => {
+    this.time.delayedCall(90, () => {
       const { board: nextBoard, movements } = collapseBoard(this.board);
       this.board = nextBoard;
 
@@ -677,8 +692,8 @@ export class MainGameScene extends Phaser.Scene {
             targets: container,
             x: x,
             y: y,
-            duration: 250,
-            ease: 'Bounce.easeOut'
+            duration: 120,
+            ease: 'Cubic.easeOut'
           });
         }
       });
@@ -686,7 +701,7 @@ export class MainGameScene extends Phaser.Scene {
       if (shiftTweens.length > 0) {
         this.tweens.addMultiple(shiftTweens);
         // Wait for sliding to finish
-        this.time.delayedCall(260, () => {
+        this.time.delayedCall(130, () => {
           this.afterMatchCollapse();
         });
       } else {
@@ -1078,6 +1093,18 @@ export class MainGameScene extends Phaser.Scene {
       const totalAnimationTime = (blockIndex * 10) + 550; // max stagger delay + fly-in + fly-out (500ms) + 50ms buffer
       this.time.delayedCall(totalAnimationTime, () => {
         this.isAnimating = false;
+        
+        // Safety check: if no moves are available even after shuffle, handle it to prevent deadlocks!
+        if (!hasAvailableMoves(this.board)) {
+          if (this.gameMode === 'arcade') {
+            this.spawnNewArcadeRow(true);
+          } else if (this.gameMode === 'time') {
+            this.repopulateBoard();
+          } else if (this.gameMode === 'classic') {
+            useGameStore.getState().endGame();
+          }
+        }
+
         if (this.gameMode === 'arcade') {
           this.checkArcadeWarningState();
         }
@@ -1502,6 +1529,9 @@ export class MainGameScene extends Phaser.Scene {
   }
 
   private gameOver() {
+    if (this.isGameOver) return;
+    this.isGameOver = true;
+
     this.isAnimating = true;
     audioService.playGameOver();
     this.clearArcadeWarning();
@@ -1673,6 +1703,10 @@ export class MainGameScene extends Phaser.Scene {
     if (this.debugComboHandler) {
       gameEventBus.off('debug:set:combo-45', this.debugComboHandler);
       this.debugComboHandler = null;
+    }
+    if (this.timeExpiredHandler) {
+      gameEventBus.off('time:expired', this.timeExpiredHandler);
+      this.timeExpiredHandler = null;
     }
     this.stopMusicAndTimers();
     this.clearArcadeWarning();

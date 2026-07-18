@@ -50,6 +50,14 @@ export const GameDetailPage: React.FC = () => {
     },
   };
 
+  if (game.id === 'slide-escape') {
+    modeDescriptions.classic = {
+      title: 'Seviye Modu',
+      desc: 'Beş başlangıç bulmacasını çözün. Her blok yalnızca uzun ekseni boyunca hareket eder; hedef bloğu sağdaki çıkışa mümkün olan en az hamlede ulaştırın.',
+      icon: Trophy,
+    };
+  }
+
   return (
     <div className="space-y-8">
       {/* Back Button */}
@@ -101,12 +109,13 @@ export const GameDetailPage: React.FC = () => {
                 <span>Kontroller</span>
               </h3>
               <ul className="text-sm text-slate-400 space-y-2 leading-relaxed">
-                <li>
-                  <strong className="text-slate-200">Masaüstü:</strong> Farenizi (Mouse) blokların üzerinde gezdirerek grupları vurgulayın. Gruba tıklayarak patlatın.
-                </li>
-                <li>
-                  <strong className="text-slate-200">Mobil:</strong> Herhangi bir bloğa dokunarak grubu seçin, aynı bloğa tekrar dokunarak (veya dokunmaya devam ederek) patlatın.
-                </li>
+                {game.id === 'slide-escape' ? <>
+                  <li><strong className="text-slate-200">Masaüstü:</strong> Bir bloğu fareyle tutup kendi yönünde sürükleyin.</li>
+                  <li><strong className="text-slate-200">Mobil:</strong> Bloğa dokunup parmağınızı yatay veya dikey eksende kaydırın.</li>
+                </> : <>
+                  <li><strong className="text-slate-200">Masaüstü:</strong> Farenizi (Mouse) blokların üzerinde gezdirerek grupları vurgulayın. Gruba tıklayarak patlatın.</li>
+                  <li><strong className="text-slate-200">Mobil:</strong> Herhangi bir bloğa dokunarak grubu seçin, aynı bloğa tekrar dokunarak (veya dokunmaya devam ederek) patlatın.</li>
+                </>}
               </ul>
             </div>
 
@@ -115,13 +124,15 @@ export const GameDetailPage: React.FC = () => {
                 <Sparkles className="h-5 w-5 text-violet-500" />
                 <span>Puanlama Formülü</span>
               </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              {game.id === 'slide-escape' ? <p className="text-sm text-slate-400 leading-relaxed">
+                Her seviye hamle sayısını kaydeder. Daha az hamle daha iyi sonuçtur; en iyi dereceniz tarayıcıda saklanır.
+              </p> : <p className="text-sm text-slate-400 leading-relaxed">
                 Puanlar, patlatılan grup boyutunun karesine bağlıdır: <br />
                 <code className="text-amber-400 font-mono block mt-1.5 p-1 bg-slate-950 border border-slate-900 rounded text-center">
                   puan = grupBoyutu × grupBoyutu × 10
                 </code>
                 Büyük grupları patlatmak çok daha fazla puan kazandırır!
-              </p>
+              </p>}
             </div>
           </div>
         </div>

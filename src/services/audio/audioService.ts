@@ -125,8 +125,8 @@ class AudioService {
     const volume = master * sfx;
     if (volume <= 0) return;
 
-    // Play an ascending sequence of notes based on combo count
-    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]; // C major scale
+    // Play an ascending sequence of notes based on combo count (pleasant C4-G5 octave range)
+    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99]; // C4, E4, G4, C5, E5, G5
     if (combo <= notes.length) {
       const noteIndex = Math.min(notes.length - 1, combo - 1);
       const freq = notes[noteIndex];
@@ -147,9 +147,8 @@ class AudioService {
       osc.start();
       osc.stop(this.ctx.currentTime + 0.26);
     } else {
-      // Max pitch reached: Play the max combo note followed by its octave (C5 -> C6)
-      // We use the same triangle wave and slide effect so it sounds cohesive with the previous combos
-      const freqs = [523.25, 1046.50]; // C5, C6
+      // Max pitch reached: Play the max combo note followed by its octave (G5 -> G6)
+      const freqs = [783.99, 1567.98]; // G5, G6
       const delay = 0.08;
       freqs.forEach((freq, idx) => {
         const time = this.ctx!.currentTime + idx * delay;
@@ -895,16 +894,22 @@ class AudioService {
       }
     } else {
       chords = [
-        [196.00, 246.94, 293.66, 392.00], // G major
-        [220.00, 261.63, 329.63, 440.00], // A minor
-        [174.61, 220.00, 261.63, 349.23], // F major
-        [196.00, 246.94, 293.66, 392.00]  // G major
+        [130.81, 164.81, 196.00, 261.63], // C major (C3, E3, G3, C4)
+        [146.83, 196.00, 246.94, 293.66], // G major (D3, G3, B3, D4)
+        [110.00, 164.81, 220.00, 261.63], // A minor (A2, E3, A3, C4)
+        [87.31, 130.81, 174.61, 261.63],  // F major (F2, C3, F3, C4)
+        [130.81, 164.81, 196.00, 261.63], // C major
+        [146.83, 196.00, 246.94, 293.66], // G major
+        [87.31, 130.81, 174.61, 261.63],  // F major
+        [146.83, 196.00, 246.94, 293.66]  // G major
       ];
-      intervalMs = 800; // Normal
+      intervalMs = 600; // Snappier, beautiful tempo
     }
 
     let chordIdx = 0;
     let step = 0;
+    // 8-step arpeggio pattern: 0 -> 2 -> 1 -> 3 -> 2 -> 1 -> 2 -> 3
+    const arpeggioPattern = [0, 2, 1, 3, 2, 1, 2, 3];
 
     const playStep = () => {
       const { master: currentMaster, music: currentMusic } = this.getVolumes();
@@ -912,8 +917,9 @@ class AudioService {
       if (vol <= 0 || !this.ctx) return;
 
       const chord = chords[chordIdx];
-      // Pick note in chord
-      const freq = chord[step % chord.length];
+      // Pick arpeggiator note in chord using the arpeggio pattern
+      const noteIdx = arpeggioPattern[step % arpeggioPattern.length];
+      const freq = chord[noteIdx % chord.length];
 
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
